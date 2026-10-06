@@ -57,6 +57,16 @@ request number, and timestamps are in `/etc/gitlab-ce-warm/seed.json`. The merge
 request is already merged, so these tags work with
 `GITLAB_DISABLED_SERVICES=sidekiq`.
 
+## Mirrors
+
+The Mirror workflow copies images listed in `mirrors/*/Dockerfile` to GHCR
+without changes, so the digest stays the same as upstream. GitHub-hosted
+runners pull from GHCR faster than from some upstream registries.
+
+| Mirror | Upstream |
+| --- | --- |
+| `ghcr.io/jetersen/forgejo` | `data.forgejo.org/forgejo/forgejo` |
+
 ## Configuration
 
 `GITLAB_DISABLED_SERVICES` takes a space-separated list of runit services to

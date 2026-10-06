@@ -1,7 +1,9 @@
 version: 2
 updates:
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /
+      - /mirrors/*
     schedule:
       interval: daily
     commit-message:

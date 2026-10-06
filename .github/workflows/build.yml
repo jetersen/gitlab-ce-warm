@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore: &unrelated
+      - mirrors/**
+      - .github/workflows/mirror.yml
+      - README.md
   pull_request:
+    paths-ignore: *unrelated
   workflow_dispatch:
 
 concurrency:

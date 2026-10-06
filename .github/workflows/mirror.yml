@@ -1,0 +1,81 @@
+name: Mirror
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - mirrors/**
+      - .github/workflows/mirror.yml
+  pull_request:
+    paths:
+      - mirrors/**
+      - .github/workflows/mirror.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Mirror ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        name:
+          - forgejo
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Read upstream reference
+        id: upstream
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          source=$(sed -n 's/^FROM \([^ ]*\)$/\1/p' "mirrors/$NAME/Dockerfile")
+          tag=${source#*:}
+          tag=${tag%@*}
+          digest=${source#*@}
+          test -n "$tag" && test "$digest" != "$source"
+          {
+            echo "source=$source"
+            echo "tag=$tag"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # imagetools copies the manifest list unchanged, so the mirror keeps the
+      # upstream digest and consumers can pin the same digest on either registry.
+      - name: Copy image
+        env:
+          DRY_RUN: ${{ github.event_name == 'pull_request' && '--dry-run' || '' }}
+          SOURCE: ${{ steps.upstream.outputs.source }}
+          TARGET: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ steps.upstream.outputs.tag }}
+        run: |
+          # shellcheck disable=SC2086 # DRY_RUN is empty or a single flag.
+          docker buildx imagetools create $DRY_RUN --tag "$TARGET" "$SOURCE"
+
+      - name: Verify mirrored digest
+        if: github.event_name != 'pull_request'
+        env:
+          EXPECTED: ${{ steps.upstream.outputs.digest }}
+          TARGET: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ steps.upstream.outputs.tag }}
+        run: |
+          actual=$(docker buildx imagetools inspect "$TARGET" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "$TARGET is $actual"
+          test "$actual" = "$EXPECTED"
