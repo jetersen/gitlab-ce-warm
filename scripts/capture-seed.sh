@@ -36,8 +36,13 @@ done
 cat "build/seeds/$seed.json"
 
 docker exec "$name" bash -euo pipefail -c "
-  gitlab-ctl stop >/dev/null
+  # Application services can miss runit's stop timeout on slow runners. Only a
+  # clean PostgreSQL shutdown matters for the snapshot, so verify that instead.
+  gitlab-ctl stop puma sidekiq gitlab-workhorse || gitlab-ctl kill puma sidekiq gitlab-workhorse || true
+  gitlab-ctl stop || true
   data=/var/opt/gitlab/postgresql/data
+  pg_controldata \"\$data\" | grep 'Database cluster state:'
+  pg_controldata \"\$data\" | grep -q 'Database cluster state: *shut down\$'
   # A cleanly stopped cluster only needs the WAL segment with its last checkpoint.
   redo=\$(pg_controldata \"\$data\" | sed -n 's/^Latest checkpoint.s REDO WAL file: *//p')
   test -n \"\$redo\"

@@ -43,6 +43,15 @@ RUN set -eux; \
     "$rails"/db/migrate "$rails"/db/post_migrate "$rails"/.rubocop_todo; \
   # Gitaly runs the Git it embeds, not these standalone copies. NGINX is disabled.
   rm -f /opt/gitlab/embedded/bin/gitaly-git-* /opt/gitlab/embedded/sbin/nginx; \
+  # Image uploads are out of scope: no EXIF stripping (exiftool needs Perl) or resizing.
+  rm -rf /opt/gitlab/embedded/bin/exiftool /opt/gitlab/embedded/lib/exiftool-perl \
+    /opt/gitlab/embedded/bin/gm /opt/gitlab/embedded/bin/gitlab-resize-image \
+    /usr/bin/perl /usr/bin/perl5* /usr/lib/x86_64-linux-gnu/perl* /usr/lib/aarch64-linux-gnu/perl* \
+    /usr/lib/*-linux-gnu/libperl.so* /usr/share/perl /usr/share/perl5; \
+  # Unused by Gitaly, which runs its embedded Git, and by an API-only instance.
+  rm -rf /opt/gitlab/embedded/libexec/git-core /opt/gitlab/embedded/share/terminfo \
+    /opt/gitlab/embedded/share/locale /opt/gitlab/embedded/service/fast-stats \
+    "$rails/vendor/project_templates" /usr/share/doc/*; \
   # Build leftovers in installed gems.
   find "$gems" -type f \( -name '*.c' -o -name '*.h' -o -name '*.hh' -o -name '*.cc' \
     -o -name '*.cpp' -o -name '*.o' -o -name '*.a' -o -name '*.rbs' \) -delete; \

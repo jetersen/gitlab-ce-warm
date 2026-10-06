@@ -26,9 +26,23 @@ Pin images by digest in automated tests.
 - Rails loads classes on demand and reuses a prebuilt Bootsnap cache.
 - KAS, Pages, the container registry, Prometheus and exporters, SSH, and
   Let's Encrypt are disabled or removed.
-- Compiled frontend assets, translations, and bundled documentation are
-  removed. The web UI is not usable; the REST and GraphQL APIs are.
+- Compiled frontend assets, emoji images, translations, and bundled
+  documentation are removed. The web UI is not usable; the REST and GraphQL
+  APIs are.
+- Database migrations and schema dumps are removed because the database is
+  already set up. GitLab's Rake tasks for migrations do not work.
+- Image uploads are not supported: exiftool, Perl, and image resizing are
+  removed. Other uploads work.
+- Creating projects from built-in templates is not supported.
+- SSH binaries, unused services, Git helper programs (Gitaly uses its embedded
+  Git), native extensions for other Ruby versions, gem build leftovers, and
+  debug symbols are removed. Third-party license notices are kept, compressed
+  with gzip.
 - Layers use zstd compression.
+
+Removals were chosen by tracing which files a booted instance opens while
+`scripts/api-exercise.sh` and an API conformance suite run. `scripts/smoke-test.sh`
+runs that exercise against every build.
 
 The container reports healthy once `/-/readiness?all=1` succeeds.
 

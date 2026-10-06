@@ -20,6 +20,11 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "$name")" = healthy ]; d
 done
 echo "Healthy after $(( $(date +%s) - start ))s"
 
+# The broad exercise merges a merge request, which needs Sidekiq.
+if [[ " ${GITLAB_DISABLED_SERVICES:-} " != *" sidekiq "* ]]; then
+  scripts/api-exercise.sh "http://$(docker port "$name" 8181/tcp)" "$token"
+fi
+
 url="http://$(docker port "$name" 8181/tcp)/api/v4"
 api() { curl --fail-with-body --silent --show-error --header "Private-Token: $token" --header 'Content-Type: application/json' "$@"; }
 [ "$(api "$url/user" | jq -r .username)" = root ]
