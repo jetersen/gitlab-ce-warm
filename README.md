@@ -38,6 +38,11 @@ Pin images by digest in automated tests.
   Git), native extensions for other Ruby versions, gem build leftovers, and
   debug symbols are removed. Third-party license notices are kept, compressed
   with gzip.
+- Ruby starts with a larger heap and higher malloc limits, so garbage
+  collection rarely runs during boot. Each Rails process starts with about
+  300 MB more memory.
+- Rails reads column information from a prebuilt schema cache instead of
+  querying PostgreSQL.
 - Layers use zstd compression.
 
 Removals were chosen by tracing which files a booted instance opens while

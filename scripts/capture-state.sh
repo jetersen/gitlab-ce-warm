@@ -16,6 +16,19 @@ cleanup
 mkdir -p build
 rm -f build/state.tar
 
+gc_env() {
+  printf "'%s' => '%s', " \
+    RUBY_GC_HEAP_0_INIT_SLOTS 2000000 \
+    RUBY_GC_HEAP_1_INIT_SLOTS 1000000 \
+    RUBY_GC_HEAP_2_INIT_SLOTS 500000 \
+    RUBY_GC_HEAP_3_INIT_SLOTS 200000 \
+    RUBY_GC_HEAP_4_INIT_SLOTS 100000 \
+    RUBY_GC_MALLOC_LIMIT 268435456 \
+    RUBY_GC_MALLOC_LIMIT_MAX 1073741824 \
+    RUBY_GC_OLDMALLOC_LIMIT 1073741824 \
+    RUBY_GC_OLDMALLOC_LIMIT_MAX 1073741824
+}
+
 omnibus_config=(
   "external_url 'http://localhost:8181'"
   "letsencrypt['enable'] = false"
@@ -32,8 +45,9 @@ omnibus_config=(
   "gitlab_rails['rake_cache_clear'] = false"
   "gitlab_rails['usage_ping_enabled'] = false"
   "gitlab_rails['gitlab_signup_enabled'] = false"
-  # The image keeps the compile cache from this boot.
-  "gitlab_rails['env'] = { 'ENABLE_BOOTSNAP' => '1' }"
+  # The image keeps the compile cache from this boot. A larger initial heap
+  # and malloc limits avoid most garbage collection while Rails boots.
+  "gitlab_rails['env'] = { 'ENABLE_BOOTSNAP' => '1', $(gc_env) }"
 )
 config=$(printf '%s; ' "${omnibus_config[@]}")
 
@@ -76,6 +90,20 @@ until docker exec "$name" sh -c "curl -sf 'http://127.0.0.1:8181/-/readiness?all
   sleep 2
 done
 echo "Configured in $(( $(date +%s) - start ))s"
+
+# Ship the database schema as a Marshal schema cache so Rails skips column
+# introspection queries. Both database configs point at the same database.
+docker exec "$name" bash -euo pipefail -c '
+  rails=/opt/gitlab/embedded/service/gitlab-rails
+  config=$rails/config/database.yml
+  sed -i "s|^  main:\$|  main:\n    schema_cache_path: db/schema_cache.dump|; s|^  ci:\$|  ci:\n    schema_cache_path: db/schema_cache.dump|" "$config"
+  test "$(grep -c "schema_cache_path: db/schema_cache.dump" "$config")" -eq 2
+  chown git "$rails/db"
+  cd "$rails"
+  chpst -u git:git -e /opt/gitlab/etc/gitlab-rails/env /opt/gitlab/embedded/bin/bundle exec rake db:schema:cache:dump
+  chown root "$rails/db"
+  test -s "$rails/db/schema_cache.dump"
+'
 
 docker exec "$name" bash -euo pipefail -c "
   # Application services can miss runit's stop timeout on slow runners. Only a

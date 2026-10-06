@@ -8,6 +8,11 @@ FROM base AS slim
 # scripts/capture-state.sh. It replaces the first-start reconfigure.
 ADD build/state.tar /
 COPY scripts/start.sh /usr/local/bin/gitlab-warm-start
+# Partition sync ran while the state was captured. Skipping it at startup saves
+# hundreds of queries per boot.
+COPY --chmod=644 <<PARTITIONS /opt/gitlab/etc/gitlab-rails/env/DISABLE_POSTGRES_PARTITION_CREATION_ON_STARTUP
+true
+PARTITIONS
 # Drop what an API-only test instance never loads: compiled frontend assets,
 # translations, bundled documentation, and binaries for disabled services.
 RUN set -eux; \
