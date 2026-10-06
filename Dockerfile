@@ -9,7 +9,7 @@ FROM base AS slim
 ADD build/state.tar /
 COPY scripts/start.sh /usr/local/bin/gitlab-warm-start
 COPY scripts/disable-gc.rb /opt/gitlab/embedded/lib/gitlab-ce-warm/disable-gc.rb
-COPY --chmod=644 patches/mustermann_decorator_cache.rb /opt/gitlab/embedded/service/gitlab-rails/config/initializers/zz_mustermann_decorator_cache.rb
+COPY --chmod=644 patches/mustermann_translator_cache.rb /opt/gitlab/embedded/service/gitlab-rails/config/initializers/zz_mustermann_translator_cache.rb
 # Boot settings for a short-lived test instance, read by Puma and Sidekiq:
 # - partition sync already ran while the state was captured
 # - the prebuilt Bootsnap cache is complete, so never write to it

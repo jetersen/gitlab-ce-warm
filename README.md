@@ -18,9 +18,9 @@ Pin the image by digest. The `root` user's access token above is public.
 - Rails loads classes on demand, reuses a prebuilt Bootsnap cache, reads a
   prebuilt schema cache, and skips partition sync and metrics setup at boot.
 - Puma and Sidekiq never run garbage collection. Puma uses about 2 GB.
-- `patches/` backports Mustermann 4.0's translator cache, which speeds up
-  compiling the API routes on the first request. On this GitLab version it is
-  faster than updating to Mustermann 4.0.
+- `patches/` caches Mustermann's translator lookup and URI-encoded characters,
+  which compiles the API routes on the first request about a third faster. This
+  is proposed upstream in gitlab-org/gitlab!260179.
 - Sidekiq does not start; the seeded merge request is already merged.
 - Puma serves port 8181 without Workhorse. Seeding uses Workhorse, but the
   tests only call JSON API endpoints, so Git over HTTP, uploads, archive
