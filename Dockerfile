@@ -110,7 +110,8 @@ COPY --from=slim \
 COPY --from=slim /opt/gitlab/embedded/service /opt/gitlab/embedded/service
 COPY --from=slim /opt/gitlab/embedded/bin /opt/gitlab/embedded/bin
 COPY --from=slim /opt/gitlab/embedded/lib/ruby/gems /opt/gitlab/embedded/lib/ruby/gems
-COPY --from=slim /var/opt/gitlab /var/opt/gitlab
+# The preseeded image rebuilds the Bootsnap cache from its own workload.
+COPY --from=slim --exclude=gitlab-rails/tmp/cache/bootsnap /var/opt/gitlab /var/opt/gitlab
 ENV PATH=/opt/gitlab/embedded/bin:/opt/gitlab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   LANG=C.UTF-8 \
   TERM=xterm
@@ -122,10 +123,44 @@ HEALTHCHECK --interval=2s --timeout=5s --start-period=10m \
   CMD curl --fail --silent 'http://127.0.0.1:8181/-/readiness?all=1' >/dev/null
 ENTRYPOINT ["/usr/local/bin/gitlab-warm-start"]
 
-# Preseeded variants add the state from scripts/capture-seed.sh. The seed's
-# generated identifiers are in /etc/gitlab-ce-warm/seed.json.
-FROM warm AS release-drafter
+# Preseeded variants add the state from scripts/capture-seed.sh, then drop
+# what the seeded tests no longer need. Seeding creates commits, which needs
+# Workhorse; the tests themselves only call JSON API endpoints, so Puma serves
+# port 8181 directly. The seed's generated identifiers are in
+# /etc/gitlab-ce-warm/seed.json.
+FROM slim AS release-drafter-seeded
+# Replace the Bootsnap cache and WAL instead of layering the seed's on top.
+RUN rm -rf /var/opt/gitlab/gitlab-rails/tmp/cache/bootsnap \
+  && find /var/opt/gitlab/postgresql/data/pg_wal -maxdepth 1 -type f -delete
 ADD build/seeds/release-drafter.tar /
 COPY build/seeds/release-drafter.json /etc/gitlab-ce-warm/seed.json
 # The seeded merge request is already merged, so nothing needs Sidekiq.
-RUN rm /opt/gitlab/service/sidekiq
+RUN set -eu; \
+  rm /opt/gitlab/service/sidekiq /opt/gitlab/service/gitlab-workhorse \
+    /opt/gitlab/embedded/bin/gitlab-workhorse; \
+  puma=/var/opt/gitlab/gitlab-rails/etc/puma.rb; \
+  sed -i "s|^bind 'tcp://127.0.0.1:8080'\$|bind 'tcp://0.0.0.0:8181'|" "$puma"; \
+  grep -q "^bind 'tcp://0.0.0.0:8181'\$" "$puma"
+
+# The same layer split as warm, so seeded files are not stored twice.
+FROM scratch AS release-drafter
+COPY --from=release-drafter-seeded \
+  --exclude=opt/gitlab/embedded/service \
+  --exclude=opt/gitlab/embedded/bin \
+  --exclude=opt/gitlab/embedded/lib/ruby/gems \
+  --exclude=var/opt/gitlab \
+  / /
+COPY --from=release-drafter-seeded /opt/gitlab/embedded/service /opt/gitlab/embedded/service
+COPY --from=release-drafter-seeded /opt/gitlab/embedded/bin /opt/gitlab/embedded/bin
+COPY --from=release-drafter-seeded /opt/gitlab/embedded/lib/ruby/gems /opt/gitlab/embedded/lib/ruby/gems
+COPY --from=release-drafter-seeded /var/opt/gitlab /var/opt/gitlab
+ENV PATH=/opt/gitlab/embedded/bin:/opt/gitlab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  LANG=C.UTF-8 \
+  TERM=xterm
+LABEL org.opencontainers.image.source=https://github.com/jetersen/gitlab-ce-warm \
+  org.opencontainers.image.description="Preconfigured GitLab CE for fast-starting API tests" \
+  org.opencontainers.image.licenses=MIT
+EXPOSE 8181
+HEALTHCHECK --interval=2s --timeout=5s --start-period=10m \
+  CMD curl --fail --silent 'http://127.0.0.1:8181/-/readiness?all=1' >/dev/null
+ENTRYPOINT ["/usr/local/bin/gitlab-warm-start"]

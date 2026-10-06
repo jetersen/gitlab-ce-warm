@@ -21,6 +21,11 @@ docker create --name "$name" --publish 127.0.0.1::8181 "$image" >/dev/null
 : > build/seeds/marker
 docker cp build/seeds/marker "$name:$marker"
 rm -f build/seeds/marker
+# The warm image has no Bootsnap cache. Let this boot and the seed build one
+# with only what they load.
+printf 0 > build/seeds/BOOTSNAP_READONLY
+docker cp build/seeds/BOOTSNAP_READONLY "$name:/opt/gitlab/etc/gitlab-rails/env/BOOTSNAP_READONLY"
+rm -f build/seeds/BOOTSNAP_READONLY
 docker start "$name" >/dev/null
 
 start=$(date +%s)
@@ -36,6 +41,8 @@ done
 cat "build/seeds/$seed.json"
 
 docker exec "$name" bash -euo pipefail -c "
+  printf 1 > /opt/gitlab/etc/gitlab-rails/env/BOOTSNAP_READONLY
+  chown root:root /opt/gitlab/etc/gitlab-rails/env/BOOTSNAP_READONLY
   # Application services can miss runit's stop timeout on slow runners. Only a
   # clean PostgreSQL shutdown matters for the snapshot, so verify that instead.
   gitlab-ctl stop puma sidekiq gitlab-workhorse || gitlab-ctl kill puma sidekiq gitlab-workhorse || true

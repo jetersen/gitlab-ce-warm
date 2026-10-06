@@ -19,12 +19,18 @@ Pin the image by digest. The `root` user's access token above is public.
   prebuilt schema cache, and skips partition sync and metrics setup at boot.
 - Puma and Sidekiq never run garbage collection. Puma uses about 2 GB.
 - `patches/` backports Mustermann 4.0's translator cache, which speeds up
-  compiling the API routes on the first request.
+  compiling the API routes on the first request. On this GitLab version it is
+  faster than updating to Mustermann 4.0.
 - Sidekiq does not start; the seeded merge request is already merged.
+- Puma serves port 8181 without Workhorse. Seeding uses Workhorse, but the
+  tests only call JSON API endpoints, so Git over HTTP, uploads, archive
+  downloads, and file or commit creation through the API do not work.
+- The Bootsnap cache only holds what the seed and its read requests load.
 - Files the API does not open are removed, including the frontend, docs,
   migrations, image upload tooling, SSH, and debug symbols. The web UI, image
   uploads, and project templates do not work.
-- Layers are zstd compressed and split for parallel pulls.
+- Layers are zstd compressed and split for parallel pulls, and seeded files
+  are not stored twice.
 
 The generated commit SHAs, merge request number, and timestamps of the seed are
 in `/etc/gitlab-ce-warm/seed.json`.

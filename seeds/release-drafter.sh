@@ -57,6 +57,16 @@ done
 
 api POST "/projects/$project/releases" '{"tag_name":"v1.0.0","name":"Version 1.0.0","description":"Seed release"}' >/dev/null
 
+# Load the code behind the suite's read requests so the Bootsnap cache has it.
+path=release-drafter-tests%2Fnested-fixtures%2Fforge-conformance
+for read in "/projects/$path" "/projects/$path/repository/files/.github%2Frelease-drafter.yml?ref=main" \
+  "/projects/$project/releases" "/projects/$project/releases/v1.0.0" "/projects/$project/repository/tags" \
+  "/projects/$project/repository/compare?from=v1.0.0&to=main" "/projects/$project/repository/commits?ref_name=main" \
+  "/projects/$project/repository/commits/$head_commit/merge_requests" \
+  "/projects/$project/merge_requests?state=merged" "/projects/$project/labels"; do
+  api GET "$read" >/dev/null
+done
+
 jq -n --arg base "$base_commit" --arg head "$head_commit" --argjson merged "$merged" '{
   baseCommit: $base,
   headCommit: $head,
