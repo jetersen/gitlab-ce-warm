@@ -25,7 +25,7 @@ RUN set -eux; \
 
 # Rebuild without the base image's declared volumes and deleted files. Separate
 # layers let a pull download them in parallel.
-FROM scratch
+FROM scratch AS warm
 COPY --from=slim --exclude=opt/gitlab/embedded/service/gitlab-rails --exclude=var/opt/gitlab / /
 COPY --from=slim /opt/gitlab/embedded/service/gitlab-rails /opt/gitlab/embedded/service/gitlab-rails
 COPY --from=slim /var/opt/gitlab /var/opt/gitlab
@@ -39,3 +39,9 @@ EXPOSE 8181
 HEALTHCHECK --interval=2s --timeout=5s --start-period=10m \
   CMD curl --fail --silent 'http://127.0.0.1:8181/-/readiness?all=1' >/dev/null
 ENTRYPOINT ["/usr/local/bin/gitlab-warm-start"]
+
+# Preseeded variants add the state from scripts/capture-seed.sh. The seed's
+# generated identifiers are in /etc/gitlab-ce-warm/seed.json.
+FROM warm AS release-drafter
+ADD build/seeds/release-drafter.tar /
+COPY build/seeds/release-drafter.json /etc/gitlab-ce-warm/seed.json

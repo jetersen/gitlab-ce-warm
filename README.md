@@ -32,6 +32,17 @@ Pin images by digest in automated tests.
 
 The container reports healthy once `/-/readiness?all=1` succeeds.
 
+## Preseeded tags
+
+Tags ending in `-release-drafter`, such as `19.1.3-ce.0-release-drafter`, also
+contain the project that
+[Release Drafter](https://github.com/release-drafter/release-drafter)'s forge
+conformance suite tests against. `seeds/release-drafter.sh` creates it while the
+image is built, so tests start without seeding. The generated commit SHAs, merge
+request number, and timestamps are in `/etc/gitlab-ce-warm/seed.json`. The merge
+request is already merged, so these tags work with
+`GITLAB_DISABLED_SERVICES=sidekiq`.
+
 ## Configuration
 
 `GITLAB_DISABLED_SERVICES` takes a space-separated list of runit services to
@@ -51,13 +62,17 @@ reachable from untrusted networks.
 ## Building
 
 `scripts/capture-state.sh` boots the base image named in the `Dockerfile` once
-and saves the configured state to `build/state.tar`. The `Dockerfile` adds that
+and saves the configured state to `build/state.tar`. The `warm` target adds that
 state to the base image, prunes unused files, and flattens the result.
+`scripts/capture-seed.sh` runs a seed script against a built image and saves
+what it changed for the preseeded targets.
 
 ```sh
 scripts/capture-state.sh
-docker buildx build --load --tag gitlab-ce-warm:test .
+docker buildx build --load --target warm --tag gitlab-ce-warm:test .
 scripts/smoke-test.sh gitlab-ce-warm:test
+scripts/capture-seed.sh release-drafter gitlab-ce-warm:test
+docker buildx build --load --target release-drafter --tag gitlab-ce-warm:release-drafter-test .
 ```
 
 The Build workflow builds `linux/amd64` and `linux/arm64` natively, runs the
