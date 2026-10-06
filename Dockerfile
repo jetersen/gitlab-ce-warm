@@ -39,6 +39,9 @@ RUN set -eux; \
   # Google Cloud API clients are only used by Google Cloud integrations.
   sed -i -E "s/^(gem 'google-apis-[a-z0-9_]+', [^#]*), feature_category:/\\1, require: false, feature_category:/" "$rails/Gemfile"; \
   rm "$rails/config/initializers/google_api_client.rb" "$rails/config/initializers/httpclient_patch.rb"; \
+  # Load internal event definitions and the emoji index on first use instead of
+  # at boot. The definitions must stay: unknown events make requests fail.
+  rm "$rails/config/initializers/internal_events.rb" "$rails/config/initializers/tanuki_emoji.rb"; \
   test "$(grep -c "^gem 'google-apis-.*require: false" "$rails/Gemfile")" -ge 10; \
   find "$rails/public/assets" -type f ! -name '*.json' -delete; \
   rm -rf "$rails/doc" "$rails/doc-locale" "$rails"/locale/*/; \

@@ -103,8 +103,10 @@ docker exec "$name" /opt/gitlab/embedded/bin/redis-cli -s /var/opt/gitlab/redis/
 docker exec "$name" bash -euo pipefail -c '
   rails=/opt/gitlab/embedded/service/gitlab-rails
   config=$rails/config/database.yml
-  sed -i "s|^  main:\$|  main:\n    schema_cache_path: db/schema_cache.dump|; s|^  ci:\$|  ci:\n    schema_cache_path: db/schema_cache.dump|" "$config"
-  test "$(grep -c "schema_cache_path: db/schema_cache.dump" "$config")" -eq 2
+  # Absolute, because Puma runs from /var/opt/gitlab/gitlab-rails/working and a
+  # relative path silently falls back to an empty cache.
+  sed -i "s|^  main:\$|  main:\n    schema_cache_path: $rails/db/schema_cache.dump|; s|^  ci:\$|  ci:\n    schema_cache_path: $rails/db/schema_cache.dump|" "$config"
+  test "$(grep -c "schema_cache_path: $rails/db/schema_cache.dump" "$config")" -eq 2
   chown git "$rails/db"
   cd "$rails"
   chpst -u git:git -e /opt/gitlab/etc/gitlab-rails/env /opt/gitlab/embedded/bin/bundle exec rake db:schema:cache:dump
