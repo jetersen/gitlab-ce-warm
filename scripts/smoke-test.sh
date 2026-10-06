@@ -21,7 +21,7 @@ done
 echo "Healthy after $(( $(date +%s) - start ))s"
 
 # The broad exercise merges a merge request, which needs Sidekiq.
-if [[ " ${GITLAB_DISABLED_SERVICES:-} " != *" sidekiq "* ]]; then
+if docker exec "$name" test -e /opt/gitlab/service/sidekiq; then
   scripts/api-exercise.sh "http://$(docker port "$name" 8181/tcp)" "$token"
 fi
 

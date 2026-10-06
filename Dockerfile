@@ -25,10 +25,21 @@ RUN set -eu; \
 # translations, bundled documentation, and binaries for disabled services.
 RUN set -eux; \
   for service in puma sidekiq; do \
-    sed -i 's|^rubyopt="-W:no-experimental"$|rubyopt="-W:no-experimental -r/opt/gitlab/embedded/lib/gitlab-ce-warm/disable-gc.rb"|' "/opt/gitlab/sv/$service/run"; \
+    sed -i 's|^rubyopt="-W:no-experimental"$|rubyopt="-W:no-experimental --disable=did_you_mean,error_highlight,syntax_suggest -r/opt/gitlab/embedded/lib/gitlab-ce-warm/disable-gc.rb"|' "/opt/gitlab/sv/$service/run"; \
     grep -q disable-gc.rb "/opt/gitlab/sv/$service/run"; \
   done; \
+  # Start Puma with one Bundler setup instead of bundle exec plus Bundler setup.
+  sed -i 's|/opt/gitlab/embedded/bin/bundle exec puma |/opt/gitlab/embedded/bin/ruby -rbundler/setup /opt/gitlab/embedded/bin/puma |' /opt/gitlab/sv/puma/run; \
+  grep -q -- '-rbundler/setup /opt/gitlab/embedded/bin/puma' /opt/gitlab/sv/puma/run; \
   rails=/opt/gitlab/embedded/service/gitlab-rails; \
+  # The boot-time warmup request renders the HTML root page, which the API
+  # tests never use.
+  sed -i '/^warmup do |app|$/,/^end$/d' "$rails/config.ru"; \
+  if grep -q warmup "$rails/config.ru"; then exit 1; fi; \
+  # Google Cloud API clients are only used by Google Cloud integrations.
+  sed -i -E "s/^(gem 'google-apis-[a-z0-9_]+', [^#]*), feature_category:/\\1, require: false, feature_category:/" "$rails/Gemfile"; \
+  rm "$rails/config/initializers/google_api_client.rb" "$rails/config/initializers/httpclient_patch.rb"; \
+  test "$(grep -c "^gem 'google-apis-.*require: false" "$rails/Gemfile")" -ge 10; \
   find "$rails/public/assets" -type f ! -name '*.json' -delete; \
   rm -rf "$rails/doc" "$rails/doc-locale" "$rails"/locale/*/; \
   cd /opt/gitlab/embedded/bin; \

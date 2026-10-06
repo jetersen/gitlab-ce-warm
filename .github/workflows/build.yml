@@ -74,8 +74,6 @@ jobs:
           tags: gitlab-ce-warm:release-drafter-test
 
       - name: Smoke test preseeded image
-        env:
-          GITLAB_DISABLED_SERVICES: sidekiq
         run: scripts/smoke-test.sh gitlab-ce-warm:release-drafter-test
 
       - if: github.event_name != 'pull_request'
