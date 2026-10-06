@@ -33,6 +33,28 @@ RUN set -eux; \
   gems=/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems; \
   rm -rf "$gems"/devfile-*/out "$gems"/elasticsearch-rails-*/lib/rails/templates; \
   rm -rf "$rails/changelogs" "$rails/CHANGELOG.md" "$rails"/public/-/graphql/introspection_result*.json; \
+  # Frontend files. Rails only reads the asset manifests when rendering HTML.
+  find "$rails/public/assets" -mindepth 1 -type f ! -path "$rails/public/assets/webpack/manifest.json" \
+    \( -path "$rails/public/assets/*/*" -o ! -name '*.json' \) -delete; \
+  rm -rf "$rails"/public/-/emojis "$rails"/public/-/speedscope "$rails"/public/-/pwa-icons \
+    "$gems"/tanuki_emoji-*/app/assets; \
+  # The database is already created, so schema dumps and migrations are unused.
+  rm -rf "$rails"/db/*.sql "$rails"/db/*.sql.bundled "$rails"/db/schema_migrations \
+    "$rails"/db/migrate "$rails"/db/post_migrate "$rails"/.rubocop_todo; \
+  # Gitaly runs the Git it embeds, not these standalone copies. NGINX is disabled.
+  rm -f /opt/gitlab/embedded/bin/gitaly-git-* /opt/gitlab/embedded/sbin/nginx; \
+  # Build leftovers in installed gems.
+  find "$gems" -type f \( -name '*.c' -o -name '*.h' -o -name '*.hh' -o -name '*.cc' \
+    -o -name '*.cpp' -o -name '*.o' -o -name '*.a' -o -name '*.rbs' \) -delete; \
+  # Keep third-party notices, compressed.
+  gzip -9f /opt/gitlab/LICENSE /opt/gitlab/dependency_licenses.json "$rails/rails-license.json"; \
+  find /opt/gitlab/licenses /opt/gitlab/LICENSES -type f ! -name '*.gz' -exec gzip -9f {} +; \
+  # Debug symbols and symbol tables are not needed to run.
+  apt-get update -qq; \
+  apt-get install -qq --no-install-recommends binutils >/dev/null; \
+  find /opt/gitlab/embedded -type f \( -perm -u+x -o -name '*.so' -o -name '*.so.*' \) -size +100k \
+    -exec sh -c 'head -c 4 "$1" | grep -q ELF && strip --strip-unneeded "$1"' _ {} \; ; \
+  apt-get purge -qq --auto-remove binutils >/dev/null; \
   rm -rf /var/lib/apt/lists/* /var/lib/dpkg/info /var/cache/* /tmp/*
 
 # Rebuild without the base image's declared volumes and deleted files. Similar
