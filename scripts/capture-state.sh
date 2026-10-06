@@ -94,7 +94,10 @@ docker exec "$name" bash -euo pipefail -c "
       -o -cnewer $marker -print
     find /etc/gitlab /var/opt/gitlab /var/log/gitlab ! -type s
   } > /tmp/state-paths
-  tar --create --file /tmp/state.tar --no-recursion --files-from /tmp/state-paths
+  # Exit status 1 only reports files that changed while read, such as logs
+  # from runit's log writers, which keep running after gitlab-ctl stop.
+  tar --create --file /tmp/state.tar --no-recursion --files-from /tmp/state-paths \\
+    --warning=no-file-changed || [ \$? -eq 1 ]
 "
 docker cp "$name:/tmp/state.tar" build/state.tar
 ls -lh build/state.tar

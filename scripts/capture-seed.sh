@@ -45,9 +45,12 @@ docker exec "$name" bash -euo pipefail -c "
   find /var/log/gitlab -type f -exec truncate --size 0 {} +
   find / -xdev \\( -path /proc -o -path /sys -o -path /dev -o -path /run \\
     -o -path /tmp -o -path /etc/hosts -o -path /etc/hostname \\
-    -o -path /etc/resolv.conf \\) -prune \\
+    -o -path /etc/resolv.conf -o -path /var/log \\) -prune \\
     -o -cnewer $marker ! -type s -print > /tmp/seed-paths
-  tar --create --file /tmp/seed.tar --no-recursion --files-from /tmp/seed-paths
+  # Exit status 1 only reports files that changed while read, such as logs
+  # from runit's log writers, which keep running after gitlab-ctl stop.
+  tar --create --file /tmp/seed.tar --no-recursion --files-from /tmp/seed-paths \\
+    --warning=no-file-changed || [ \$? -eq 1 ]
 "
 docker cp "$name:/tmp/seed.tar" "build/seeds/$seed.tar"
 ls -lh "build/seeds/$seed.tar"

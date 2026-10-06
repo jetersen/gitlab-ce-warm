@@ -20,8 +20,20 @@ RUN set -eux; \
     gitlab-zip-metadata node_exporter pgbouncer_exporter postgres_exporter \
     praefect prometheus redis-benchmark redis_exporter registry spamcheck \
     valkey-benchmark valkey-cli valkey-server; \
+  rm -f go-crond; \
   rm -rf /opt/gitlab/embedded/lib/python3.12 /opt/gitlab/embedded/lib/libpython3.12.so*; \
-  rm -rf /var/cache/* /tmp/*
+  # SSH is disabled. Gitaly reads the gitlab-shell directory but not its binaries.
+  rm -rf /opt/gitlab/embedded/service/gitlab-shell/bin; \
+  # Precompiled gems ship native extensions for every Ruby version; keep only
+  # the embedded Ruby's.
+  ruby_version=$(/opt/gitlab/embedded/bin/ruby -e 'print RUBY_VERSION[/\A\d+\.\d+/]'); \
+  find /opt/gitlab/embedded/lib/ruby/gems -depth -type d -regextype posix-extended \
+    -regex '.*/[0-9]+\.[0-9]+' ! -name "$ruby_version" \
+    -execdir test -d "$ruby_version" \; -exec rm -rf {} +; \
+  gems=/opt/gitlab/embedded/lib/ruby/gems/3.3.0/gems; \
+  rm -rf "$gems"/devfile-*/out "$gems"/elasticsearch-rails-*/lib/rails/templates; \
+  rm -rf "$rails/changelogs" "$rails/CHANGELOG.md" "$rails"/public/-/graphql/introspection_result*.json; \
+  rm -rf /var/lib/apt/lists/* /var/lib/dpkg/info /var/cache/* /tmp/*
 
 # Rebuild without the base image's declared volumes and deleted files. Similar
 # sized layers let a pull extract one layer while it downloads the next.
