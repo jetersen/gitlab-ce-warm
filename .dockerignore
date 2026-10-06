@@ -3,3 +3,4 @@
 !build/seeds/*.tar
 !build/seeds/*.json
 !scripts/start.sh
+!scripts/disable-gc.rb

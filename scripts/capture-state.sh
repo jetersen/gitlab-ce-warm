@@ -91,6 +91,13 @@ until docker exec "$name" sh -c "curl -sf 'http://127.0.0.1:8181/-/readiness?all
 done
 echo "Configured in $(( $(date +%s) - start ))s"
 
+# Metrics are useless in a test instance, and initializing them compiles every
+# API route at boot.
+docker exec "$name" /opt/gitlab/bin/gitlab-psql -d gitlabhq_production -c \
+  'UPDATE application_settings SET prometheus_metrics_enabled = false' >/dev/null
+# Settings are cached in Redis. Nothing else is stored there yet.
+docker exec "$name" /opt/gitlab/embedded/bin/redis-cli -s /var/opt/gitlab/redis/redis.socket FLUSHALL >/dev/null
+
 # Ship the database schema as a Marshal schema cache so Rails skips column
 # introspection queries. Both database configs point at the same database.
 docker exec "$name" bash -euo pipefail -c '

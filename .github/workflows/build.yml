@@ -73,7 +73,7 @@ jobs:
           load: true
           tags: gitlab-ce-warm:release-drafter-test
 
-      - name: Smoke test preseeded image without Sidekiq
+      - name: Smoke test preseeded image
         env:
           GITLAB_DISABLED_SERVICES: sidekiq
         run: scripts/smoke-test.sh gitlab-ce-warm:release-drafter-test
@@ -86,16 +86,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # zstd layers decompress several times faster than gzip during pulls.
-      - name: Push image by digest
-        if: github.event_name != 'pull_request'
-        id: push-warm
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: warm
-          platforms: linux/${{ matrix.arch }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true,compression=zstd,compression-level=3,force-compression=true,oci-mediatypes=true
-
       - name: Push preseeded image by digest
         if: github.event_name != 'pull_request'
         id: push-release-drafter
@@ -106,14 +96,12 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true,compression=zstd,compression-level=3,force-compression=true,oci-mediatypes=true
 
-      - name: Export digests
+      - name: Export digest
         if: github.event_name != 'pull_request'
         env:
-          WARM_DIGEST: ${{ steps.push-warm.outputs.digest }}
           RELEASE_DRAFTER_DIGEST: ${{ steps.push-release-drafter.outputs.digest }}
         run: |
-          mkdir -p "$RUNNER_TEMP/digests/warm" "$RUNNER_TEMP/digests/release-drafter"
-          touch "$RUNNER_TEMP/digests/warm/${WARM_DIGEST#sha256:}"
+          mkdir -p "$RUNNER_TEMP/digests/release-drafter"
           touch "$RUNNER_TEMP/digests/release-drafter/${RELEASE_DRAFTER_DIGEST#sha256:}"
 
       - if: github.event_name != 'pull_request'
@@ -165,7 +153,5 @@ jobs:
             done
             docker buildx imagetools create "$@" "${sources[@]}"
           }
-          create warm --tag "$IMAGE:$version" --tag "$IMAGE:latest"
           create release-drafter --tag "$IMAGE:$version-release-drafter" --tag "$IMAGE:release-drafter"
-          docker buildx imagetools inspect "$IMAGE:$version"
           docker buildx imagetools inspect "$IMAGE:$version-release-drafter"

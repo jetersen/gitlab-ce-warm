@@ -8,14 +8,26 @@ FROM base AS slim
 # scripts/capture-state.sh. It replaces the first-start reconfigure.
 ADD build/state.tar /
 COPY scripts/start.sh /usr/local/bin/gitlab-warm-start
-# Partition sync ran while the state was captured. Skipping it at startup saves
-# hundreds of queries per boot.
-COPY --chmod=644 <<PARTITIONS /opt/gitlab/etc/gitlab-rails/env/DISABLE_POSTGRES_PARTITION_CREATION_ON_STARTUP
-true
-PARTITIONS
+COPY scripts/disable-gc.rb /opt/gitlab/embedded/lib/gitlab-ce-warm/disable-gc.rb
+# Boot settings for a short-lived test instance, read by Puma and Sidekiq:
+# - partition sync already ran while the state was captured
+# - the prebuilt Bootsnap cache is complete, so never write to it
+# - no memory watchdog thread and no database config validation
+RUN set -eu; \
+  cd /opt/gitlab/etc/gitlab-rails/env; \
+  printf true > DISABLE_POSTGRES_PARTITION_CREATION_ON_STARTUP; \
+  printf 1 > BOOTSNAP_READONLY; \
+  printf false > GITLAB_MEMORY_WATCHDOG_ENABLED; \
+  printf true > SKIP_DATABASE_CONFIG_VALIDATION; \
+  chmod 644 DISABLE_POSTGRES_PARTITION_CREATION_ON_STARTUP BOOTSNAP_READONLY \
+    GITLAB_MEMORY_WATCHDOG_ENABLED SKIP_DATABASE_CONFIG_VALIDATION
 # Drop what an API-only test instance never loads: compiled frontend assets,
 # translations, bundled documentation, and binaries for disabled services.
 RUN set -eux; \
+  for service in puma sidekiq; do \
+    sed -i 's|^rubyopt="-W:no-experimental"$|rubyopt="-W:no-experimental -r/opt/gitlab/embedded/lib/gitlab-ce-warm/disable-gc.rb"|' "/opt/gitlab/sv/$service/run"; \
+    grep -q disable-gc.rb "/opt/gitlab/sv/$service/run"; \
+  done; \
   rails=/opt/gitlab/embedded/service/gitlab-rails; \
   find "$rails/public/assets" -type f ! -name '*.json' -delete; \
   rm -rf "$rails/doc" "$rails/doc-locale" "$rails"/locale/*/; \
@@ -100,3 +112,5 @@ ENTRYPOINT ["/usr/local/bin/gitlab-warm-start"]
 FROM warm AS release-drafter
 ADD build/seeds/release-drafter.tar /
 COPY build/seeds/release-drafter.json /etc/gitlab-ce-warm/seed.json
+# The seeded merge request is already merged, so nothing needs Sidekiq.
+RUN rm /opt/gitlab/service/sidekiq
