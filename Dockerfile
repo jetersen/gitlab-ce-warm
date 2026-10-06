@@ -23,11 +23,18 @@ RUN set -eux; \
   rm -rf /opt/gitlab/embedded/lib/python3.12 /opt/gitlab/embedded/lib/libpython3.12.so*; \
   rm -rf /var/cache/* /tmp/*
 
-# Rebuild without the base image's declared volumes and deleted files. Separate
-# layers let a pull download them in parallel.
+# Rebuild without the base image's declared volumes and deleted files. Similar
+# sized layers let a pull extract one layer while it downloads the next.
 FROM scratch AS warm
-COPY --from=slim --exclude=opt/gitlab/embedded/service/gitlab-rails --exclude=var/opt/gitlab / /
-COPY --from=slim /opt/gitlab/embedded/service/gitlab-rails /opt/gitlab/embedded/service/gitlab-rails
+COPY --from=slim \
+  --exclude=opt/gitlab/embedded/service \
+  --exclude=opt/gitlab/embedded/bin \
+  --exclude=opt/gitlab/embedded/lib/ruby/gems \
+  --exclude=var/opt/gitlab \
+  / /
+COPY --from=slim /opt/gitlab/embedded/service /opt/gitlab/embedded/service
+COPY --from=slim /opt/gitlab/embedded/bin /opt/gitlab/embedded/bin
+COPY --from=slim /opt/gitlab/embedded/lib/ruby/gems /opt/gitlab/embedded/lib/ruby/gems
 COPY --from=slim /var/opt/gitlab /var/opt/gitlab
 ENV PATH=/opt/gitlab/embedded/bin:/opt/gitlab/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   LANG=C.UTF-8 \
