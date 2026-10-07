@@ -5,7 +5,7 @@ GitLab CE images built for one job: starting a disposable GitLab for
 conformance tests as fast as possible. They are not meant for anything else.
 
 ```sh
-docker run --detach --publish 8181:8181 ghcr.io/jetersen/gitlab-ce-warm:19.1.3-ce.0-release-drafter
+docker run --detach --publish 8181:8181 ghcr.io/jetersen/gitlab-ce-warm:19.4.1-ce.0-release-drafter
 curl --header 'Private-Token: glpat-gitlab-ce-warm-root-token' http://localhost:8181/api/v4/user
 ```
 

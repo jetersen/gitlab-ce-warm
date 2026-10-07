@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Dependabot updates this tag and digest. scripts/capture-state.sh reads it too.
-FROM gitlab/gitlab-ce:19.1.3-ce.0@sha256:d160bc91d3a112fdcaead0ecd76076e3371677c1314f266d9c26b5c3d3363db1 AS base
+FROM gitlab/gitlab-ce:19.4.1-ce.0@sha256:9b33b45b9f42d176bada85ee5ecb81ddab7e506c435f44cd582206e284b2809c AS base
 
 FROM base AS slim
 # Configured Omnibus state captured from the same base image by
@@ -73,6 +73,10 @@ RUN set -eux; \
   # The database is already created, so schema dumps and migrations are unused.
   rm -rf "$rails"/db/*.sql "$rails"/db/*.sql.bundled "$rails"/db/schema_migrations \
     "$rails"/db/migrate "$rails"/db/post_migrate "$rails"/.rubocop_todo; \
+  # Omnibus bundles several PostgreSQL versions; keep the one the data uses.
+  pg_version=$(cat /var/opt/gitlab/postgresql/data/PG_VERSION); \
+  test -x "/opt/gitlab/embedded/postgresql/$pg_version/bin/postgres"; \
+  find /opt/gitlab/embedded/postgresql -mindepth 1 -maxdepth 1 ! -name "$pg_version" -exec rm -rf {} +; \
   # Gitaly runs the Git it embeds, not these standalone copies. NGINX is disabled.
   rm -f /opt/gitlab/embedded/bin/gitaly-git-* /opt/gitlab/embedded/sbin/nginx; \
   # Image uploads are out of scope: no EXIF stripping (exiftool needs Perl) or resizing.
