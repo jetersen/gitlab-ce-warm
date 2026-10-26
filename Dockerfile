@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Dependabot updates this tag and digest. scripts/capture-state.sh reads it too.
-FROM gitlab/gitlab-ce:19.4.1-ce.0@sha256:9b33b45b9f42d176bada85ee5ecb81ddab7e506c435f44cd582206e284b2809c AS base
+FROM gitlab/gitlab-ce:19.5.1-ce.0@sha256:bb79dc86267c557fd11e7feb0cd9dd506dd02e991ecdd6cae11ca7d7e5d36fc3 AS base
 
 FROM base AS slim
 # Configured Omnibus state captured from the same base image by
